@@ -29,7 +29,7 @@ Part1: tRNA-gene combination from gene annotation files
 
 ### Gene information from GFF file
 ```{r}
-gene.info.from.gff <- read_delim("F:/PhD_Research/All_Annotations/PN40024_5.1_on_T2T_ref_with_names.gff3", delim = "\t", col_names = FALSE) %>%
+gene.info.from.gff <- read_delim("Reference_genome_annotation.gff3", delim = "\t", col_names = FALSE) %>%
  separate(col = X1, into = c("X1", "X2", "X3", "X4", "X5", "X6", "X7", "X8", "X9"), sep = "\t") %>% # Using this line when your annotation is gff3
   dplyr::select(X1,X4,X5,X9,X7,X3) %>%
   set_colnames(c("gene.chr", "gene.start", "gene.end", "gene.id", "gene.strand", "gene.biotype")) %>%
@@ -67,59 +67,28 @@ CDS.start.end.for.gene <- CDS.info.sorted %>%
   ) %>%
   dplyr::select(gene.chr, gene.start, gene.end, gene.id, gene.strand, gene.biotype) %>%
   arrange(gene.chr, gene.start)
-
-
-
-
-gene.info.from.gff <- read_delim(
-  "F:/PhD_Research/All_Annotations/PN40024_5.1_on_T2T_ref_with_names.gff3",
-  delim = "\t", col_names = c("gene.chr","V2","gene.biotype","gene.start","gene.end","V6","gene.strand","V8","gene.id")
-) %>%
-  select(gene.chr, gene.start, gene.end, gene.id, gene.strand, gene.biotype) %>%
-  mutate(across(c(gene.start, gene.end), as.numeric)) %>%
-  arrange(gene.chr, gene.start) %>%
-  na.omit()
-
-# CDS start and end points per gene
-CDS.start.end.for.gene <- gene.info.from.gff %>%
-  filter(gene.biotype == "CDS") %>%
-  mutate(gene.id = sub(".*;Parent=(.*)_t\\d+.*", "\\1", gene.id)) %>%
-  group_by(gene.id) %>%
-  summarise(
-    gene.chr    = first(gene.chr),
-    gene.start  = min(gene.start),
-    gene.end    = max(gene.end),
-    gene.strand = first(gene.strand),
-    gene.biotype = first(gene.biotype),
-    .groups = "drop"
-  ) %>%
-  select(gene.chr, gene.start, gene.end, gene.id, gene.strand, gene.biotype) %>%
-  arrange(gene.chr, gene.start)
-
-
-
 ```
 # output the gene info for bedtools use
 ```{r}
 write.table(CDS.start.end.for.gene,
-            file = "Vitis_T2T_CDS_info.txt",
+            file = "CDS_info.txt",
             quote = FALSE, sep = "\t",
             row.names = FALSE, col.names = FALSE) 
 
 write.table(gene.information,
-            file = "Vitis_T2T_Gene_info.txt",
+            file = "Gene_info.txt",
             quote = FALSE, sep = "\t",
             row.names = FALSE, col.names = FALSE)
 ```
 
 # tRNA info from tRNAscan_SE
 ```Linux
-tRNAscan-SE -E -o VvT2T_tRNA.txt T2T_ref.fasta
-awk 'NR > 3 {print $1 "\t" $3 "\t" $4 "\t" $5 "\t" $9 "\t" $6}' VvT2T_tRNA.txt > VvT2T_tRNA.bed
+tRNAscan-SE -E -o tRNA.txt Reference_genome.fasta
+awk 'NR > 3 {print $1 "\t" $3 "\t" $4 "\t" $5 "\t" $9 "\t" $6}' tRNA.txt > tRNA.bed
 ```
 # Read tRNA info
 ```{r}
-tRNA.info <- read_delim("F:/PhD_Research/2nd_Chapter_Mobile_RNA/Reference_genomes/Shiraz_PN_Rug/Vitis_vinifera/VvT2T_tRNA.bed", delim = "\t", col_names = FALSE) 
+tRNA.info <- read_delim("tRNA.bed", delim = "\t", col_names = FALSE) 
 colnames(tRNA.info) <- c("chr", "start", "end", "amino_acid", "score", "anticodon")
 # Add a tRNA id
 tRNA.info <- tRNA.info %>%
@@ -148,7 +117,7 @@ tRNA.fixed <- tRNA.info %>%
 # Output tRNA infor
 ```{r}
 write.table(tRNA.fixed,
-            file = "Vitis_T2T_tRNA_infor.txt",
+            file = "tRNA_infor.txt",
             quote = FALSE, sep = "\t",
             row.names = FALSE, col.names = FALSE)
 ```
@@ -156,26 +125,26 @@ write.table(tRNA.fixed,
 # Make genome size file for bedtools use
 ```Linux
 conda activate samtools_env
-samtools faidx T2T_ref.fasta
-cut -f1,2 T2T_ref.fasta.fai > T2T_ref.txt
+samtools faidx Reference_genome.fasta
+cut -f1,2 Reference_genome.fasta.fai > Reference_genome.txt
 
 ## Step2: find closeest gene to an tRNA for both behind and after by BEDTools on Phoenix HPC terminal. 
-Using ignore up/down stream (-iu/id) options is to make sure all tRNA can find genes associated with either up or down stream of the tRNA.
+#Using ignore up/down stream (-iu/id) options is to make sure all tRNA can find genes associated with either up or down stream of the tRNA.
 # the .txt files are Windows-style CR-LF line endings. use notepad++ Edit>EOL conversion>Unix to fix them
 conda activate
 # Sort the CDS file
-sort -k1,1 -k2,2n Vitis_T2T_CDS_info.txt > Vitis_T2T_CDS_info.sorted.txt
+sort -k1,1 -k2,2n CDS_info.txt > CDS_info.sorted.txt
 # Sort the tRNA file
-sort -k1,1 -k2,2n Vitis_T2T_tRNA_infor.txt > Vitis_T2T_tRNA_sorted.txt
-sort -k1,1 T2T_ref.txt > T2T_ref_sorted.txt
+sort -k1,1 -k2,2n tRNA_infor.txt > tRNA_sorted.txt
+sort -k1,1 Reference_genome.txt > Reference_genome_sorted.txt
 
-bedtools closest -id -a Vitis_T2T_tRNA_sorted.txt -b Vitis_T2T_CDS_info.sorted.txt -g T2T_ref_sorted.txt -D ref > Vitis_T2T_closest_tRNA_gene_upS.bed
-bedtools closest -iu -a Vitis_T2T_tRNA_sorted.txt -b Vitis_T2T_CDS_info.sorted.txt -g T2T_ref_sorted.txt -D ref > Vitis_T2T_closest_tRNA_gene_downS.bed
+bedtools closest -id -a tRNA_sorted.txt -b CDS_info.sorted.txt -g Reference_genome_sorted.txt -D ref > closest_tRNA_gene_upS.bed
+bedtools closest -iu -a tRNA_sorted.txt -b CDS_info.sorted.txt -g Reference_genome_sorted.txt -D ref > closest_tRNA_gene_downS.bed
 ```
 # combine two result files from BedTools and sort, then refine info into proper format
 ```{r}
-closest_tRNA_CDS.up <- read.delim("Vitis_T2T_closest_tRNA_gene_upS.bed", header=FALSE)
-closest_tRNA_CDS.down <- read.delim("Vitis_T2T_closest_tRNA_gene_downS.bed", header=FALSE)
+closest_tRNA_CDS.up <- read.delim("closest_tRNA_gene_upS.bed", header=FALSE)
+closest_tRNA_CDS.down <- read.delim("closest_tRNA_gene_downS.bed", header=FALSE)
 
 closest_tRNA_CDS <- rbind(closest_tRNA_CDS.up,closest_tRNA_CDS.down) %>% 
   unique() %>% 
@@ -211,14 +180,14 @@ tRNA.CDS.combo <- closest_tRNA_CDS %>%
 # Output tRNA-gene combination info
 ```{r}
 write.table(tRNA.CDS.combo,
-            file = "Vitis_T2T_tRNA_CDS_Combination.txt",
+            file = "tRNA_CDS_Combination.txt",
             quote = FALSE, sep = "\t",
             row.names = FALSE, col.names = FALSE)
 ```
 # filter commonly expressed tRNA and gene 
 # setup the bundary for the whole genome
 ```{r}
-Seqinfo <- read_delim("T2T_ref.fasta.fai", 
+Seqinfo <- read_delim("Reference_genome.fasta.fai", 
                       delim = "\t", col_names = FALSE) %>%
   dplyr::select(X1, X2) %>%
   set_names(c("seqnames", "seqlengths"))
@@ -234,37 +203,32 @@ Seqinfo <- with(Seqinfo,
 # tRNA in UTR
 ```{r}
 #UTR information
-T2T_tran_gr <- import("F:/PhD_Research/All_Annotations/PN40024_5.1_on_T2T_ref_with_names.gff3")
+Gff_tran_gr <- import("Reference_genome_annotation.gff3")
+mcols(Gff_tran_gr) <- mcols(Gff_tran_gr)[, c("ID", "Parent", "type")]
+Gff_tran_db <- txdbmaker::makeTxDbFromGRanges(Gff_tran_gr)
+Gff_five_utrs  <- fiveUTRsByTranscript(Gff_tran_db, use.names = TRUE)
+Gff_three_utrs <- threeUTRsByTranscript(Gff_tran_db, use.names = TRUE)
 
-mcols(T2T_tran_gr) <- mcols(T2T_tran_gr)[, c("ID", "Parent", "type")]
-
-T2T_tran_db <- txdbmaker::makeTxDbFromGRanges(T2T_tran_gr)
-
-T2T_five_utrs  <- fiveUTRsByTranscript(T2T_tran_db, use.names = TRUE)
-T2T_three_utrs <- threeUTRsByTranscript(T2T_tran_db, use.names = TRUE)
-
-T2T_five_utrs_df <- as.data.frame(T2T_five_utrs)
-T2T_three_utrs_df <- as.data.frame(T2T_three_utrs)
-
-tran_length_table <- transcriptLengths(T2T_tran_db, 
+Gff_five_utrs_df <- as.data.frame(Gff_five_utrs)
+Gff_three_utrs_df <- as.data.frame(Gff_three_utrs)
+# Find the longest transcript for each gene
+tran_length_table <- transcriptLengths(Gff_tran_db, 
                                   with.cds_len = TRUE, 
                                   with.utr5_len = TRUE, 
                                   with.utr3_len = TRUE)
-
 canonical_transcripts <- tran_length_table %>%
   group_by(gene_id) %>%
   slice_max(order_by = tx_len, n = 1, with_ties = FALSE) %>%
   pull(tx_name)
 
-
 # Filter 5' UTRs
-T2T_five_utrs_longest <- T2T_five_utrs_df %>%
+Gff_five_utrs_longest <- Gff_five_utrs_df %>%
   filter(group_name %in% canonical_transcripts)
 # Filter 3' UTRs
-T2T_three_utrs_longest <- T2T_three_utrs_df %>%
+Gff_three_utrs_longest <- Gff_three_utrs_df %>%
   filter(group_name %in% canonical_transcripts)
 
-five_prime_clean <- T2T_five_utrs_longest %>%
+five_prime_clean <- Gff_five_utrs_longest %>%
   as.data.frame() %>%
   mutate(gene.biotype = "five_prime_UTR") %>%
   dplyr::select(
@@ -276,7 +240,7 @@ five_prime_clean <- T2T_five_utrs_longest %>%
     gene.biotype
   )
 
-three_prime_clean <- T2T_three_utrs_longest %>%
+three_prime_clean <- Gff_three_utrs_longest %>%
   as.data.frame() %>%
   mutate(gene.biotype = "three_prime_UTR") %>%
   dplyr::select(
@@ -347,12 +311,10 @@ GRange_tRNA <- makeGRangesFromDataFrame(tRNA.info,
 ## Count reads for each tRNA GRange from your RNA seq bam files 
 ```{r}
 # specify Samples
-bam.dir <- "E:/RNAseq_SR/SNPCalling_T2T_ref_HISAT/bamfiles_HISAT2_T2T_ref/RS/Root/" # Dir for bamfiles
+bam.dir <- "/Path_to_bam_files/" # Dir for bamfiles
 bamfiles <- list.files(bam.dir, pattern=".bam$", full.names = TRUE)
-
-#SampleName <- paste0("Sample_",str_extract(basename(bamfiles),"^[0-9]+")) 
 SampleName <- basename(bamfiles)
-# Maybe differdent str_extract pattern? change your bami file names
+
 counts <- lapply (bamfiles,function(bamfile){
   baifile <- paste0(bamfile,".bai")
   bam.input <- readGAlignments(bamfile,
@@ -374,18 +336,17 @@ tRNA.counts <- cbind(tRNA.info,counts)
 ### Check point: save the tRNA.counts
 ```{r}
 write.table(tRNA.counts,
-            file = "RSR_tRNA_counts.xlsx",
+            file = "tRNA_counts.xlsx",
             quote = FALSE, sep = "\t", row.names = FALSE)
 ```
 ### Load tRNA counts
 ```{r}
-tRNA.counts <- read.delim("RSR_tRNA_counts.xlsx", stringsAsFactors = FALSE)
+tRNA.counts <- read.delim("tRNA_counts.xlsx", stringsAsFactors = FALSE)
 ```
 ## filter commonly expressed tRNA 
 ```{r}
 # filter expressed tRNA 
-# filter needs to be defined according to your dataset. Here, the requirement is at least one read align to this tRNA and reads alignment commonly presents at least in 6 samples 
-tRNA.expressed.AllSample <- rowSums(dplyr::select(tRNA.counts,6:9) >= 1) == 4 
+tRNA.expressed.AllSample <- rowSums(dplyr::select(tRNA.counts,6:8) >= 1) == 3 # change the column (6:8) and rowSums number (3) according to your replicates
 # return logical value for all read count column
 sum(tRNA.expressed.AllSample) 
 common.tRNA <- tRNA.counts[tRNA.expressed.AllSample,]
@@ -409,7 +370,7 @@ GRange_gene <- makeGRangesFromDataFrame(gene.counts,
                                         strand.field = "gene.strand",
                                         starts.in.df.are.0based = FALSE)
 ```
-## Count reads for each gene GRange from ```bam``` files. Take more than 2 hours, try bioparalle package.
+## Count reads for each gene GRange from ```bam``` files.
 ```{r}
 counts <- lapply (bamfiles,function(bamfile){
   baifile <- paste0(bamfile,".bai")
@@ -419,7 +380,7 @@ counts <- lapply (bamfiles,function(bamfile){
                                param = ScanBamParam(which = GRange_gene))
   
   countOverlaps(GRange_gene, bam.input,
-                maxgap=0L, minoverlap=1L,
+                maxgap=0L, minoverlap=10L,
                 type=c("any"),
                 select=c("all"),
                 ignore.strand=TRUE)
@@ -431,19 +392,19 @@ gene.counts <- cbind(gene.counts,counts)
 ### Check point: save the gene.counts
 ```{r}
 write.table(gene.counts,
-            file = "RSR_gene_counts.xlsx",
+            file = "gene_counts.xlsx",
             quote = FALSE, sep = "\t", row.names = FALSE)
 ```
 
 ### Load gene counts
 ```{r}
-gene.counts <- read.delim("RSR_gene_counts.xlsx", stringsAsFactors = FALSE)
+gene.counts <- read.delim("gene_counts.xlsx", stringsAsFactors = FALSE)
 ```
 
 ## filter commonly expressed gene
 ```{r}
 # filter expressed gene 
-gene.expressed.AllSample <- rowSums(dplyr::select(gene.counts, 6:9) >= 1) == 4 # same requirement as above 
+gene.expressed.AllSample <- rowSums(dplyr::select(gene.counts, 6:8) >= 1) == 3 # same requirement as above 
 sum(gene.expressed.AllSample) 
 common.gene <- gene.counts[gene.expressed.AllSample,]
 tRNA.CDS.expressed.combo <- filter(tRNA.expressed.CDS.combo, gene.id %in% common.gene$gene.id)
@@ -494,7 +455,6 @@ intron.counts <- exon.info.canonical %>%
     .groups = "drop"
   ) %>%
   mutate(intron_count = exon_count - 1)
-
 
 genes.no.or.one.intron <- intron.counts %>%
   filter(intron_count %in% c(0, 1)) %>%
@@ -567,11 +527,11 @@ tgene.expressed.with2exon <-  subset(tgene.expressed.with1and2exon, !(gene.id %i
 
 ```{r}
 write.table(expressed.gene.only.one.exon,
-            file = "RSR_T2T_tGene_expressed_no_intron.xlsx",
+            file = "tGene_expressed_no_intron.xlsx",
            quote = FALSE, sep = "\t", row.names = FALSE)
 
 write.table(tgene.expressed.with2exon,
-            file = "RSR_T2T_tGene_expressed_one_intron.xlsx",
+            file = "tGene_expressed_one_intron.xlsx",
             quote = FALSE, sep = "\t", row.names = FALSE)
 ```
 # Get UTR information
@@ -623,7 +583,7 @@ UTR_exon.info <- rbind(exon.info,
                        UTR3.info) %>%
   arrange(chr, start, end)
 ```
-# pull out intron coordinates based on the exon information (WHY Challot's old code integrate UTR infor???)
+# pull out intron coordinates based on the exon information (WHY Charllot's old pipeline integrate UTR infor into intron???)
 ```{r}
 # 1. Start with ONLY the Exon data
 # Do not include UTR rows here, no reason to include them. 
@@ -719,7 +679,7 @@ intron.closest.for.stats.up <- data_frame(chr = intron.closest.for.stats.up$chr,
                                           tRNA.upstream = rep("NA", nrow(intron.closest.for.stats.up)))
 
 # range for 2nd closest intron to intergenic 
-# if a gene dose not have more than one intron then the intron/intron comprison will be missing
+# if a gene dose not have more than one intron then the intron/intron comprison will be missing here
 res <- lapply(list.gene.id,function(g){
   rowNb <- which(intron.info$gene.id == g)
   start <- intron.info$intron.start[rowNb]
@@ -811,31 +771,6 @@ final.stats.info <- do.call("rbind", list(intron.closest,
   dplyr::arrange(gene.id)
 ```
 
-#########=================================================================###########
-FOR TESTING, NO NEED TO RUN
-
-This chunk is a test code to understand if the intron.info only has tRNA.gene.expressed.combo which have UTR annotation. You do not need to run this chunk in the pipeline
-
-```{r}
-# test if gene without UTR5 are in UTR5.gene.info, also see how many genes in intron.info, delete all objects by rm() later
-gene.id.final.stats.info <- final.stats.info$gene.id %>% unique()
-gene.id.tRNA.CDS <- tRNA.CDS.expressed.combo$gene.id %>% unique()
-gene.id.no.intron <- expressed.gene.only.one.exon$gene.id %>% unique()
-gene.id.two.intron <- tgene.expressed.exon3$gene.id %>% unique()
-gene.id.one.intron <- tgene.expressed.with2exon$gene.id %>% unique()
-gene.id.intron.info <- intron.info$gene.id %>% unique()
-
-gene.id.intron.info.not.in.tgene.expreesed.exon3 <- intron.info %>% filter(gene.id %in% tgene.expressed.exon3$gene.id == FALSE)
-
-common.gene.exion.utr5 <- UTR5.info%>%filter(gene.id%in%gene.id.tRNA.CDS)
-gene.id.utr5 <- common.gene.exion.utr5$gene.id %>% unique()
-#remove everything in this chunk
-rm(list = c('gene.id.final.stats.info','gene.id.tRNA.CDS','gene.id.no.intron','gene.id.two.intron','gene.id.one.intron','gene.id.intron.info','gene.id.intron.info.not.in.tgene.expreesed.exon3','common.gene.exion.utr5'))
-```
-FOR TESTING, NO NEED TO RUN
-#########=================================================================###########
-
-
 ####====================#### 
 Part4: Calculate all Intergenic and introns coverage for expressed tRNA-mRNA combination. Including genes with 1/0 intron
 ####====================####
@@ -896,7 +831,7 @@ coverage.intergenic <- lapply (bamfiles,function(bamfile){
 }) 
 
 names(coverage.intergenic) <- SampleName
-DicistronicName <- names(coverage.intergenic$RSR12.sorted.bam) 
+DicistronicName <- names(coverage.intergenic$RNA.sorted.bam) 
 # give name of dicistronic in order, any sample is ok the order is the same 
 
 # form a proper dataframe for all intergenic AC
@@ -923,10 +858,10 @@ nZero.intergenic <- AC.nZero.intergenic %>%
 # calculate the AC and nZero for each sample
 coverage.intron.closest <- lapply (bamfiles,function(bamfile){
   Cal_Coverage(GRange_intron.closest, bamfile)
-}) # takes about 4 min for 85 ranges assess 6 bam files
+})
 
 names(coverage.intron.closest) <- SampleName
-IntronName <- names(coverage.intron.closest$RSR12.sorted.bam) # same as DicistronicName
+IntronName <- names(coverage.intron.closest$RNA.sorted.bam)
 
 # form a proper dataframe for all intron closest AC
 AC.intron.closest <- lapply(names(coverage.intron.closest), function(x){
@@ -945,10 +880,10 @@ AC.intron.closest <- lapply(names(coverage.intron.closest), function(x){
 # calculate the AC and nZero for each sample
 coverage.intron.2nd.closest <- lapply (bamfiles,function(bamfile){
   Cal_Coverage(GRange_intron.2nd.closest, bamfile)
-}) # takes about 4 min for 66 ranges assess 6 bam files
+})
 
 names(coverage.intron.2nd.closest) <- SampleName
-IntronName <- names(coverage.intron.2nd.closest$RSR12.sorted.bam) # same as DicistronicName
+IntronName <- names(coverage.intron.2nd.closest$RNA.sorted.bam)
 
 # form a proper dataframe for all intron 2nd.closest AC
 AC.intron.2nd.closest <- lapply(names(coverage.intron.2nd.closest), function(x){
@@ -1149,13 +1084,6 @@ intergeic.sign.final <- tTestResults.final$IntergenicVsintron_closest_to_interge
 intron.not.sign.final <- tTestResults.final$intron_2nd_closest_to_intergenicVsintron_closest_to_intergenic %>% 
   filter((FDR < 0.05 & V > 0) | FDR >=0.05)
 final.sign <- intersect(intron.not.sign.final$id,intergeic.sign.final$id)
-#-----------------------------------------------------------------#
-#for adjP (optional)
-#intergeic.sign.final <- tTestResults.final$IntergenicVsIntron1 %>% 
- # filter(adjP < 0.05, V < 0)
-#intron.not.sign.final <- tTestResults.final$Intron2VsIntron1 %>% 
- # filter((adjP < 0.05 & V > 0) | adjP >=0.05) 
-#final.sign.adjP <- intersect(intron.not.sign.final$id,intergeic.sign.final$id) 
 ```
 
 ####====================#### 
@@ -1163,7 +1091,7 @@ Part6: Assess continuous coverage for candidates that pass the t.test
 ####====================####
 
 ```{r}
-allIntergenic <- names(coverage.intergenic$RSR12.sorted.bam) # pull out sample name from any sample
+allIntergenic <- names(coverage.intergenic$RNA.sorted.bam) # pull out sample name from any sample
 allSamples <- names(coverage.intergenic)
 coverage.samples <- lapply(allIntergenic,function(intergenic){
   v <- lapply(allSamples, function(sample){
@@ -1197,7 +1125,7 @@ continuous.coverage.final <- left_join(coverage.list.final,combined.nZero, by = 
 ```{r}
 ##output the file
 write.table(continuous.coverage.final,
-            file = "RSR_T2T_with_two_intron.xlsx",
+            file = "Continuous_Coverage_with_two_intron.xlsx",
             quote = FALSE, sep = "\t", row.names = FALSE)
 ```
 
@@ -1229,13 +1157,13 @@ introns.bed <- intron.info %>%
 # Save the Poteintial DT candidates with 1/0 intron into bed files
 ```{r}
 write.table(tRNA_mRNA_expressed_One_Intron,
-            file = "RSR_T2T_One_intron.txt",
+            file = "One_intron.txt",
             quote = FALSE, sep = "\t",
             row.names = FALSE, col.names = FALSE)
 
 # All introns information are in intron.info
 write.table(introns.bed,
-            file = "T2T_ALL_introns_info.txt",
+            file = "ALL_introns_info.txt",
             quote = FALSE, sep = "\t",
             row.names = FALSE, col.names = FALSE)
 ```
@@ -1244,31 +1172,16 @@ write.table(introns.bed,
 ```Linux
 cd /mnt/f/PhD_Research/2nd_Chapter_Mobile_RNA/SNP_calling_RS_Final_mobileRNA_pipeline/Chapter2_R_code
 # For candidates with one intron:
-bedtools closest -a RSR_T2T_One_intron.txt -b T2T_ALL_introns_info.txt > RSR_One_Intron_closest_Intron.bed
+bedtools closest -a T2T_One_intron.txt -b ALL_introns_info.txt > One_Intron_closest_Intron.bed
 ```
 # Step3. Construct Intron information for candidates with one intron
 # Load Closest introns information
 ```{r}
 # tRNA-mRNA expressed candidates with one intron:
-closest_Intron_for_tRNA_mRNA_expressed_One_Intron <- read.delim("RSR_One_Intron_closest_Intron.bed", header=FALSE) %>%
+closest_Intron_for_tRNA_mRNA_expressed_One_Intron <- read.delim("One_Intron_closest_Intron.bed", header=FALSE) %>%
   set_colnames(c("chr", "One.intron.start", "One.intron.end", "One.intron.id", "One.intron.strand",
                  "nearby.Intron.Chr", "nearby.Intron.start", "nearby.Intron.end", "nearby.Intron.id","nearby.gene.id", "nearby.gene.strand"))  
 ```
-######===========###########
-Specific for Ruggeri grafted on Ruggeri Leaf RNA data. 
-
-!!!!DO NOT run this chunk in other datasets !!!!!
-
-# Clean up one gene 140rug17522 which whole contig only one gene
-```{r}
-closest_Intron_for_tRNA_mRNA_expressed_One_Intron_clean <- closest_Intron_for_tRNA_mRNA_expressed_One_Intron %>%
-  filter(One.intron.id != "140rug17522")
-
-tRNA_mRNA_expressed_One_Intron_clean <- tRNA_mRNA_expressed_One_Intron %>%
-  filter(gene.id != "140rug17522")
-```
-######===========###########
-
 # Make information for 1 intron genes
 ```{r}
 # !!! The intron id here is two closes introns from the candidate gene
@@ -1339,7 +1252,6 @@ One_intron_final_stats_info <- do.call("rbind", list(One_intron_Self_Intron_for_
 ### Build ``GRange`` objects
 ```{r}
 # Intergenic GRange has been build, no need repeat here
-
 # Intron self
 GRange_intron.Self <- One_intron_Self_Intron_for_stats %>%
   dplyr::select(chr, start, end, ids, type) %>%
@@ -1379,7 +1291,7 @@ coverage.intron.Self <- lapply (bamfiles,function(bamfile){
 }) 
 
 names(coverage.intron.Self) <- SampleName
-IntronName <- names(coverage.intron.Self$RSR12.sorted.bam) # same as DicistronicName
+IntronName <- names(coverage.intron.Self$RNA.sorted.bam) # same as DicistronicName
 
 # form a proper dataframe for all intron closest AC
 AC.intron.Self <- lapply(names(coverage.intron.Self), function(x){
@@ -1400,7 +1312,7 @@ coverage.intron.Nearby <- lapply (bamfiles,function(bamfile){
   Cal_Coverage(GRange_unique, bamfile)
 }) 
 names(coverage.intron.Nearby) <- SampleName
-IntronName <- names(coverage.intron.Nearby$RSR12.sorted.bam)
+IntronName <- names(coverage.intron.Nearby$RNA.sorted.bam)
 
 # form a proper dataframe for all intron closest AC
 AC.intron.Nearby <- lapply(names(coverage.intron.Nearby), function(x){
@@ -1488,7 +1400,7 @@ tRnaToGene_One_intron <- One_Intron_aveCoverage.final %>%
   mutate(id = as.character(id)) %>%
   split(f = .$id) %>%
   lapply(function(x){
-    if (nrow(x) == 1) return(x) # This removes the genes with >1 tRNA, already fixed with unique tRNA-gene combo id
+    if (nrow(x) == 1) return(x) # This removes the genes with >1 nearby tRNA, already fixed with unique tRNA-gene combo id
   }) %>%
   bind_rows() 
 ```
@@ -1561,17 +1473,10 @@ intergeic.sign.final_One_intron <- tTestResults.final_One_intron$intergenicVsint
 intron.not.sign.final_One_intron <- tTestResults.final_One_intron$intron_2nd_closest_to_intergenicVsintron_closest_to_intergenic %>% 
   filter((FDR < 0.05 & V > 0) | FDR >=0.05)
 final.sign_One_intron <- intersect(intron.not.sign.final_One_intron$id,intergeic.sign.final_One_intron$id)
-#-----------------------------------------------------------------#
-#for adjP (optional)
-#intergeic.sign.final <- tTestResults.final$IntergenicVsIntron1 %>% 
- # filter(adjP < 0.05, V < 0)
-#intron.not.sign.final <- tTestResults.final$Intron2VsIntron1 %>% 
- # filter((adjP < 0.05 & V > 0) | adjP >=0.05) 
-#final.sign.adjP <- intersect(intron.not.sign.final$id,intergeic.sign.final$id) 
 ```
 #Step6. Assess continuous coverage for One intron candidates that pass the t.test
 ```{r}
-allIntergenic <- names(coverage.intergenic$RSR12.sorted.bam) # pull out sample name from any sample
+allIntergenic <- names(coverage.intergenic$RNA.sorted.bam) # pull out sample name from any sample
 allSamples <- names(coverage.intergenic)
 coverage.samples <- lapply(allIntergenic,function(intergenic){
   v <- lapply(allSamples, function(sample){
@@ -1603,18 +1508,17 @@ continuous.coverage.final_One_intron <- left_join(coverage.list.final_One_intron
 
 coverage.list.final_One_intron <- coverage.list.final_One_intron %>%
   dplyr::select(ids,
-                RSR12.sorted.bam_nZero,
-                RSR21.sorted.bam_nZero,
-                RSR3.sorted.bam_nZero,
-                RSR4.sorted.bam_nZero)
-One_Intron_Potential_DT_Cantdidates <- rowSums(dplyr::select(coverage.list.final_One_intron, 2:5) == 0 ) == 4 
+                RNA1.sorted.bam_nZero,
+                RNA2.sorted.bam_nZero,
+                RNA3.sorted.bam_nZero) # replicates 1 to 3
+One_Intron_Potential_DT_Cantdidates <- rowSums(dplyr::select(coverage.list.final_One_intron, 2:4) == 0 ) == 3 
 One_Intron_RT_Candidate <- coverage.list.final_One_intron[One_Intron_Potential_DT_Cantdidates,]
 ```
 # export results
 ```{r}
 ##output the file
 write.table(continuous.coverage.final_One_intron,
-            file = "RSR_T2T_with_one_intron.xlsx",
+            file = "Continuous_coverage_with_one_intron.xlsx",
             quote = FALSE, sep = "\t", row.names = FALSE)
 ```
 
@@ -1625,7 +1529,7 @@ Part8: t-test for candidates without intron 0 intron
 ```{r}
 # One exon means no intron, load expressed genes with only one exon
 tRNA_mRNA_expressed_No_Intron <- expressed.gene.only.one.exon %>%
-  dplyr::mutate(start = start - 1) %>% # Bedtools use 0 start position rather than other packages 1
+  dplyr::mutate(start = start - 1) %>% 
   dplyr::select(chr, start, end, gene.id, gene.strand) %>%
   set_colnames(c("gene.chr", "gene.start", "gene.end", "gene.id", "gene.strand"))%>%
   arrange(gene.chr, gene.start) %>%
@@ -1634,7 +1538,7 @@ tRNA_mRNA_expressed_No_Intron <- expressed.gene.only.one.exon %>%
 # Output
 ```{r}
 write.table(tRNA_mRNA_expressed_No_Intron,
-            file = "RSR_T2T_No_intron.txt",
+            file = "RNA_No_intron.txt",
             quote = FALSE, sep = "\t",
             row.names = FALSE, col.names = FALSE)
 ```
@@ -1642,14 +1546,14 @@ write.table(tRNA_mRNA_expressed_No_Intron,
 
 ```Linux
 # For candidates with no intron:               
-bedtools closest -a RSR_T2T_No_intron.txt \
--b T2T_ALL_introns_info.txt \
--k 2 > RSR_No_Intron_closest2_Introns.bed  
+bedtools closest -a RNA_No_intron.txt \
+-b ALL_introns_info.txt \
+-k 2 > RNA_No_Intron_closest2_Introns.bed  
 ```
 # Step3. Construct Intron information for candidates without intron
 # tRNA-mRNA expressed candidates with No intron
 ```{r}
-closest_Introns_for_tRNA_mRNA_expressed_No_Intron <- read.delim("RSR_No_Intron_closest2_Introns.bed", header=FALSE) %>%
+closest_Introns_for_tRNA_mRNA_expressed_No_Intron <- read.delim("RNA_No_Intron_closest2_Introns.bed", header=FALSE) %>%
   set_colnames(c("chr", "No.intron.start", "No.intron.end", "No.intron.id", "No.intron.strand",
                  "nearby.Intron.Chr", "nearby.Intron.start", "nearby.Intron.end", "nearby.Intron.id","nearby.gene.id", "nearby.gene.strand")) 
 ```
@@ -1699,11 +1603,9 @@ No_intron_final_stats_info <- do.call("rbind", list(No_intron_Nearby_Introns_for
 ```
 
 # Step4. Calculate coverage for intron one (from nearby), intron two (from nearby) and intergenic region for candidates with 0 intron
-## Candidate with only 1 intron
 ### Build ``GRange`` objects
 ```{r}
 # Intergenic GRange has been build, no need repeat here
-
 # Nearby gene introns
 GRange_No_Intron_1st_Nearby <- No_intron_Nearby_Introns_for_stats_1st_nearby %>%
   dplyr::select(chr, start, end, ids, type) %>%
@@ -1749,7 +1651,7 @@ coverage_No_Intron_1st_Nearby <- lapply (bamfiles,function(bamfile){
 }) 
 
 names(coverage_No_Intron_1st_Nearby) <- SampleName
-IntronName <- names(coverage_No_Intron_1st_Nearby$RSR12.sorted.bam) # same as DicistronicName
+IntronName <- names(coverage_No_Intron_1st_Nearby$RNA.sorted.bam) 
 
 AC.intron_No_Intron_1st_Nearby <- lapply(names(coverage_No_Intron_1st_Nearby), function(x){
   coverage_No_Intron_1st_Nearby[[x]] %>%
@@ -1773,7 +1675,7 @@ coverage_No_Intron_2st_Nearby <- lapply (bamfiles,function(bamfile){
 }) 
 
 names(coverage_No_Intron_2st_Nearby) <- SampleName
-IntronName <- names(coverage_No_Intron_2st_Nearby$RSR12.sorted.bam) # same as DicistronicName
+IntronName <- names(coverage_No_Intron_2st_Nearby$RNA.sorted.bam) 
 
 AC.intron_No_Intron_2st_Nearby <- lapply(names(coverage_No_Intron_2st_Nearby), function(x){
   coverage_No_Intron_2st_Nearby[[x]] %>%
@@ -1845,8 +1747,6 @@ No_Intron_aveCoverage.all <- AC.final %>%
   unique() %>%
  mutate(id = gsub("^intergenic_", "", id))
 
-# AC.intergenic ids is not DT id, they are intergenic ID, remove "intergenic_" part to match
-
 No_Intron_aveCoverage.final <- No_Intron_aveCoverage.all %>%
   reshape2::melt(id.vars = c("ids", "chr", "start", "end", "type", "id", "strand", "length"),
        value.name = "aveCoverage", variable.name = "Sample") %>%
@@ -1865,7 +1765,7 @@ tRnaToGene_No_intron <- No_Intron_aveCoverage.final %>%
   mutate(id = as.character(id)) %>%
   split(f = .$id) %>%
   lapply(function(x){
-    if (nrow(x) == 1) return(x) # This removes the genes with >1 tRNA, already fixed with unique tRNA-gene combo id
+    if (nrow(x) == 1) return(x)
   }) %>%
   bind_rows() 
 ```
@@ -1938,17 +1838,10 @@ intergeic.sign.final_No_intron <- tTestResults.final_No_intron$intergenicVsintro
 intron.not.sign.final_No_intron <- tTestResults.final_No_intron$intron_2nd_closest_to_intergenicVsintron_closest_to_intergenic %>% 
   filter((FDR < 0.05 & V > 0) | FDR >=0.05)
 final.sign_No_intron <- intersect(intron.not.sign.final_No_intron$id,intergeic.sign.final_No_intron$id)
-#-----------------------------------------------------------------#
-#for adjP (optional)
-#intergeic.sign.final <- tTestResults.final$IntergenicVsIntron1 %>% 
- # filter(adjP < 0.05, V < 0)
-#intron.not.sign.final <- tTestResults.final$Intron2VsIntron1 %>% 
- # filter((adjP < 0.05 & V > 0) | adjP >=0.05) 
-#final.sign.adjP <- intersect(intron.not.sign.final$id,intergeic.sign.final$id) 
 ```
 ##Step6. Assess continuous coverage for candidates that pass the t.test
 ```{r}
-allIntergenic <- names(coverage.intergenic$RSR12.sorted.bam) # pull out sample name from any sample
+allIntergenic <- names(coverage.intergenic$RNA.sorted.bam) # pull out sample name from any sample
 allSamples <- names(coverage.intergenic)
 coverage.samples <- lapply(allIntergenic,function(intergenic){
   v <- lapply(allSamples, function(sample){
@@ -1984,7 +1877,7 @@ continuous.coverage.final_No_intron <- left_join(coverage.list.final_No_intron,c
 
 coverage.list.final_No_intron <- coverage.list.final_No_intron %>%
   dplyr::select(ids,
-                RSR12.sorted.bam_nZero,
+                RNA.sorted.bam_nZero,
                 RSR21.sorted.bam_nZero,
                 RSR3.sorted.bam_nZero,
                 RSR4.sorted.bam_nZero)
@@ -1995,7 +1888,7 @@ No_Intron_RT_Candidate <- coverage.list.final_No_intron[No_Intron_Potential_DT_C
 ```{r}
 ##output the file
 write.table(continuous.coverage.final_No_intron,
-            file = "RSR_T2T_with_No_intron.xlsx",
+            file = "Continuous_coverage_with_No_intron.xlsx",
             quote = FALSE, sep = "\t", row.names = FALSE)
 ```
 
@@ -2044,7 +1937,7 @@ DT_Final_Classified <- DT_with_Gene_Startend %>%
 # export results
 ```{r}
 write.table(DT_Final_Classified,
-            file = "RSL_Final_Result_withIntronNmb.xlsx",
+            file = "Final_Result_withIntronNmb.xlsx",
             quote = FALSE, sep = "\t", row.names = FALSE)
 ```
 
