@@ -1,0 +1,31 @@
+name: dirtv2
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+
+# Relaxed dependency list — no version pins so the solver has more freedom.
+# Use this if conf/environment.yml fails to solve on your platform.
+dependencies:
+  - python>=3.9
+  - sra-tools
+  - adapterremoval
+  - fastqc
+  - hisat2
+  - samtools
+  - bedtools
+  - trnascan-se
+
+  # R + Bioconductor (CRAN packages prefixed r-, Bioconductor prefixed bioconductor-)
+  - r-base>=4.2
+  - r-tidyverse
+  - r-magrittr
+  - r-data.table
+  - r-openxlsx
+  - r-reshape2
+  - r-rmarkdown
+  - r-knitr
+  - bioconductor-genomicalignments
+  - bioconductor-genomicfeatures
+  - bioconductor-rtracklayer
+  - bioconductor-txdbmaker

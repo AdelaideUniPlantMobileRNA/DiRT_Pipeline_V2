@@ -1,0 +1,13 @@
+sample,fastq_1,fastq_2
+ERR1,/path/to/fastq/ERR3338762_1.fastq.gz,/path/to/fastq/ERR3338762_2.fastq.gz
+ERR1,/path/to/fastq/ERR3338763_1.fastq.gz,/path/to/fastq/ERR3338763_2.fastq.gz
+ERR1,/path/to/fastq/ERR3338764_1.fastq.gz,/path/to/fastq/ERR3338764_2.fastq.gz
+ERR1,/path/to/fastq/ERR3338765_1.fastq.gz,/path/to/fastq/ERR3338765_2.fastq.gz
+ERR2,/path/to/fastq/ERR3338766_1.fastq.gz,/path/to/fastq/ERR3338766_2.fastq.gz
+ERR2,/path/to/fastq/ERR3338767_1.fastq.gz,/path/to/fastq/ERR3338767_2.fastq.gz
+ERR2,/path/to/fastq/ERR3338768_1.fastq.gz,/path/to/fastq/ERR3338768_2.fastq.gz
+ERR2,/path/to/fastq/ERR3338769_1.fastq.gz,/path/to/fastq/ERR3338769_2.fastq.gz
+ERR3,/path/to/fastq/ERR3338770_1.fastq.gz,/path/to/fastq/ERR3338770_2.fastq.gz
+ERR3,/path/to/fastq/ERR3338771_1.fastq.gz,/path/to/fastq/ERR3338771_2.fastq.gz
+ERR3,/path/to/fastq/ERR3338772_1.fastq.gz,/path/to/fastq/ERR3338772_2.fastq.gz
+ERR3,/path/to/fastq/ERR3338773_1.fastq.gz,/path/to/fastq/ERR3338773_2.fastq.gz

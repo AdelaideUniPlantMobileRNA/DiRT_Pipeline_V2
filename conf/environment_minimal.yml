@@ -1,0 +1,28 @@
+name: dirtv2
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+
+# Minimal env for running ONLY the R analysis on already-aligned BAMs.
+# Use this when you already have sorted+indexed BAMs and don't need the
+# upstream trimming/alignment steps (i.e. you're skipping HISAT2,
+# AdapterRemoval, FastQC, SRA-tools). Saves ~1.5 GB vs environment.yml.
+dependencies:
+  - samtools          # for faidx (genome .fai index)
+  - bedtools          # called from R via system2()
+  - trnascan-se       # to generate tRNA.bed from the genome FASTA
+
+  # R + Bioconductor — the actual DiRT v2 analysis
+  - r-base>=4.2
+  - r-tidyverse
+  - r-magrittr
+  - r-data.table
+  - r-openxlsx
+  - r-reshape2
+  - r-rmarkdown
+  - r-knitr
+  - bioconductor-genomicalignments
+  - bioconductor-genomicfeatures
+  - bioconductor-rtracklayer
+  - bioconductor-txdbmaker

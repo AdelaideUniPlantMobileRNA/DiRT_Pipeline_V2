@@ -1,0 +1,3 @@
+# DEPRECATED. The pipeline no longer downloads SRA data.
+# Pre-download your FASTQ files (or use bin/optional_sra_download.sh) and
+# list the paired-end pairs in samples.csv instead.

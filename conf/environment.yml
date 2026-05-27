@@ -1,0 +1,27 @@
+name: dirtv2
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  - sra-tools=3.0.10
+  - adapterremoval=2.3.3
+  - fastqc=0.12.1
+  - hisat2=2.2.1
+  - samtools=1.19
+  - bedtools=2.31.1
+  - trnascan-se=2.0.12
+  - r-base=4.3
+  - r-tidyverse
+  - r-magrittr
+  - r-data.table
+  - r-openxlsx
+  - r-reshape2
+  - r-rmarkdown
+  - r-knitr
+  - bioconductor-genomicalignments
+  - bioconductor-genomicfeatures
+  - bioconductor-rtracklayer
+  - bioconductor-txdbmaker

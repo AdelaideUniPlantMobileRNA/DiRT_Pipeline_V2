@@ -1,0 +1,33 @@
+# Run artefacts — should never be committed
+results/
+results_test/
+work/
+.nextflow*
+*.nextflow.log
+trace-*.txt
+report-*.html
+timeline-*.html
+
+# R / Rmd byproducts
+.Rhistory
+.Rapp.history
+.RData
+.Ruserdata
+.Rproj.user/
+*_cache/
+*_files/
+*.html
+
+# bin/ run artefacts (kept under bin/ during interactive testing)
+bin/results/
+bin/bedtools_work/
+bin/_cache/
+bin/*.html
+
+# Backup files from editors
+*~
+*.bak
+*.bak[0-9]
+*.swp
+.DS_Store
+Thumbs.db
