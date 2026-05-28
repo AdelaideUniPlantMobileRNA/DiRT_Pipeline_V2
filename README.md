@@ -5,14 +5,15 @@ from paired-end Illumina RNA-seq data of any plant species. Inputs are a referen
 genome FASTA, a GFF3 annotation (e.g. from EnsemblPlants), and either raw FASTQ
 files or pre-aligned BAMs.
 
-The pipeline supports **two entry points**:
+The pipeline supports **three entry points**:
 
 | Use this when… | Run this | Section |
 |---|---|---|
+| **First time here — verify the pipeline runs on your machine** | Download the manuscript dataset from Zenodo + Rscript heredoc (~1.5 h) | [Reproducibility test](#reproducibility-test-using-the-manuscript-dataset-15-h-20-gb) |
 | You have raw FASTQ files (or just SRA accessions) | `nextflow run main.nf` | [Path A](#path-a-from-fastqsra--nextflow) |
-| You already have sorted+indexed BAMs (one per replicate) | `Rscript -e "rmarkdown::render(...)"` | [Path B](#path-b-from-pre-aligned-bams--rscript) |
+| You already have sorted+indexed BAMs (one per replicate) | `Rscript - <<'RSCRIPT' … RSCRIPT` (heredoc) | [Path B](#path-b-from-pre-aligned-bams--rscript) |
 
-Both paths produce the same final result tables.
+The quick test and Path B produce the same kind of final result table; Path A produces the same table plus all the intermediate FASTQ/BAM artefacts.
 
 ## Repository layout
 
@@ -109,6 +110,100 @@ Rscript -e 'library(tidyverse); library(GenomicAlignments); library(rtracklayer)
 ```
 
 If anything is missing, stop and fix the install before proceeding.
+
+---
+
+## Reproducibility test using the manuscript dataset (~1.5 h, ~20 GB)
+
+**Recommended first step after installation.** Download the pre-aligned grape
+leaf RNA-seq dataset used in the manuscript from Zenodo and verify that your
+installation reproduces the published ~40 dicistronic-transcript candidates.
+
+The dataset is deposited at: https://doi.org/10.5281/zenodo.20421456
+(*Vitis vinifera* RSL leaf, 4 biological replicates, aligned to PN40024 v5.1 T2T
+reference).
+
+### Q.1. Download the test bundle from Zenodo (~30–60 min on a fast connection)
+
+```bash
+mkdir -p /path/to/dirtv2_grape_test
+cd       /path/to/dirtv2_grape_test
+
+BASE=https://zenodo.org/records/20421456/files
+for f in RSL1.sorted.bam RSL1.sorted.bam.bai \
+         RSL2.sorted.bam RSL2.sorted.bam.bai \
+         RSL3.sorted.bam RSL3.sorted.bam.bai \
+         RSL4.sorted.bam RSL4.sorted.bam.bai \
+         T2T_ref.fasta T2T_ref.fasta.fai \
+         PN40024_5.1_on_T2T_ref_with_names.gff3 \
+         VvT2T_tRNA.bed \
+         checksums.sha256; do
+    wget -q --show-progress "$BASE/$f"
+done
+
+# Verify every download is intact — every line must say OK
+sha256sum -c checksums.sha256
+```
+
+### Q.2. Run the DiRT v2 analysis (~1–1.5 h depending on CPU/disk)
+
+```bash
+conda activate dirtv2
+
+WORK_DIR=$PWD
+Rscript - <<'RSCRIPT' 2>&1 | tee dirtv2_grape_test.log
+WORK_DIR <- normalizePath(".")
+rmarkdown::render(
+  '/path/to/DiRTv2_pipeline/bin/DiRTv2_manual_optimized.Rmd',
+  output_file   = 'DiRTv2_grape_test_report.html',
+  output_dir    = WORK_DIR,
+  knit_root_dir = WORK_DIR,
+  params = list(
+    gff_file       = paste0(WORK_DIR, '/PN40024_5.1_on_T2T_ref_with_names.gff3'),
+    genome_fai     = paste0(WORK_DIR, '/T2T_ref.fasta.fai'),
+    tRNA_bed       = paste0(WORK_DIR, '/VvT2T_tRNA.bed'),
+    bam_dir        = WORK_DIR,
+    bam_pattern    = '\\.sorted\\.bam$',
+    sample_names   = c('RSL1','RSL2','RSL3','RSL4'),
+    min_count      = 1,
+    fdr_threshold  = 0.05,
+    out_dir        = paste0(WORK_DIR, '/results')
+  )
+)
+RSCRIPT
+```
+
+Notes:
+- `tRNA.bed` is already included in the bundle (`VvT2T_tRNA.bed`) so the ~30 min
+  tRNAscan-SE step is skipped — the test runs straight from BAM coverage counting.
+- Replace `/path/to/DiRTv2_pipeline/` with the actual location of this cloned repo.
+
+### Q.3. Verify the result
+
+```bash
+python3 -c "
+import openpyxl
+ws = openpyxl.load_workbook('results/Final_Result_Manual_optimized.xlsx').active
+print(f'rows incl. header: {ws.max_row}')
+print(f'dicistronic-transcript candidates: {ws.max_row - 1}')
+"
+```
+
+**Expected: approximately 40 dicistronic-transcript candidates** in
+`results/Final_Result_Manual_optimized.xlsx`. Your count may differ by 1–2 due
+to `slice_max` tie-breaking on transcripts of equal length (see manuscript
+Methods). This matches the result reported in the manuscript for the same
+dataset.
+
+- **0 candidates or pipeline error:** check Section 6 Troubleshooting.
+- **Wildly different count (< 20 or > 60):** check that your FDR threshold is
+  0.05 (default), `min_count` is 1, and all 4 BAMs verified `OK` against
+  `checksums.sha256`.
+
+Once the grape reproduction passes, you can apply the same `Rscript` heredoc
+pattern to your own data — see [Path B](#path-b-from-pre-aligned-bams--rscript)
+for the parameter explanations, or use [Path A](#path-a-from-fastqsra--nextflow)
+to start from raw FASTQ.
 
 ---
 
@@ -271,56 +366,124 @@ cp /path/to/DiRTv2_pipeline/bin/DiRTv2_manual_optimized.Rmd .
 
 No need to copy or symlink the BAMs — `bam_dir` below will point at them directly.
 
-### B.5. Run the optimized R Markdown analysis
+### B.5. Run the R Markdown analysis
 
 ⚠ **Use absolute paths for every input.** Relative paths inside `rmarkdown::render`
 can resolve differently than your shell's `cd`, leading to "BAM files not found" errors.
 
-```bash
-cd /path/to/dirtv2_run
+We use a `heredoc` (`<<'RSCRIPT' ... RSCRIPT`) instead of `Rscript -e "..."`. Heredocs
+pass every character through to R unchanged, so you don't have to fight bash about
+backslash escaping in regex patterns like `bam_pattern`.
 
-Rscript -e "rmarkdown::render('DiRTv2_manual_optimized.Rmd', \
-    params = list( \
-        gff_file       = '/abs/path/to/annotation.gff3', \
-        genome_fai     = '/abs/path/to/genome.fasta.fai', \
-        tRNA_bed       = '/abs/path/to/tRNA.bed', \
-        bam_dir        = '/abs/path/to/folder_containing_bams', \
-        sample_names   = c('RSL1','RSL2','RSL3','RSL4'), \
-        min_count      = 1, \
-        fdr_threshold  = 0.05, \
-        out_dir        = 'results', \
-    ))" 2>&1 | tee dirtv2_render.log
+```bash
+WORK_DIR=/abs/path/to/dirtv2_run        # <-- put your run folder absolute path here
+mkdir -p "$WORK_DIR" && cd "$WORK_DIR"
+
+Rscript - <<RSCRIPT 2>&1 | tee dirtv2_render.log
+WORK_DIR <- "$WORK_DIR"     # imported from the bash variable above
+rmarkdown::render(
+  '/abs/path/to/DiRTv2_pipeline/bin/DiRTv2_manual_optimized.Rmd',
+  output_file   = 'DiRTv2_manual_optimized_report.html',
+  output_dir    = WORK_DIR,
+  knit_root_dir = WORK_DIR,
+  params = list(
+    gff_file       = '/abs/path/to/annotation.gff3',
+    genome_fai     = '/abs/path/to/genome.fasta.fai',
+    tRNA_bed       = '/abs/path/to/tRNA.bed',
+    bam_dir        = '/abs/path/to/folder_containing_bams',
+    bam_pattern    = '\\\\.sorted\\\\.bam\$',
+    sample_names   = c('rep1','rep2','rep3'),
+    min_count      = 1,
+    fdr_threshold  = 0.05,
+    out_dir        = paste0(WORK_DIR, '/results')
+  )
+)
+RSCRIPT
 ```
+
+**Why all-absolute paths matter:** `rmarkdown::render` evaluates each R chunk in a temporary working directory that's NOT the folder you `cd`'d to. If you write `out_dir = 'results'` or `knit_root_dir = '.'`, the intermediates and the final xlsx silently land somewhere unexpected (usually next to the .Rmd file). Defining `WORK_DIR` as a bash variable, importing it into R via the unquoted heredoc (`<<RSCRIPT`, no quotes on the delimiter), and using it for `output_dir`, `knit_root_dir` and `out_dir` keeps everything in one place.
+
+**A note on the regex escaping:** because the heredoc delimiter is *unquoted* (`<<RSCRIPT`, no single quotes around it) so bash will expand `$WORK_DIR`, bash *also* eats backslashes — that's why `bam_pattern` needs **eight** backslashes (`\\\\.sorted\\\\.bam`), not the four you'd use in a quoted heredoc. If you prefer to avoid this gymnastics, drop the bash variable and hard-code the path inside the heredoc instead, with the single-quoted delimiter `<<'RSCRIPT'` — then `bam_pattern = '\\.sorted\\.bam$'` (four backslashes) works.
 
 #### Critical naming convention
 
-`sample_names` MUST exactly match the BAM filename stem (everything before `.sorted.bam`):
+`bam_pattern` is a regular expression matching the *suffix* of every BAM filename.
+The Rmd derives an implicit sample ID for each BAM by stripping `bam_pattern` from
+its basename, then matches those implicit IDs against `sample_names` to fix column
+order:
 
-| sample_names entry | Expected BAM filename in `bam_dir/` |
-|---|---|
-| `RSL1` | `RSL1.sorted.bam` (+ `RSL1.sorted.bam.bai`) |
-| `LeafRep_A` | `LeafRep_A.sorted.bam` (+ `LeafRep_A.sorted.bam.bai`) |
+| BAM filename in `bam_dir/` | Set `bam_pattern` to … | Then `sample_names` entry is … |
+|---|---|---|
+| `RSL1.sorted.bam` (+ `.bai`) | `'\.sorted\.bam$'` (default) | `RSL1` |
+| `ERR1.sorted.merged.bam` (+ `.bai`) | `'\.sorted\.merged\.bam$'` | `ERR1` |
+| `LeafRep_A.bam` (+ `.bai`) | `'\.bam$'` | `LeafRep_A` |
 
-### B.6. (Worked example with the test data referenced in this repo)
+If `sample_names` and the derived IDs don't match, the Rmd halts with an error
+message listing both sets — usually a typo or a wrong `bam_pattern`.
+
+### B.6. Worked examples
+
+**Example 1 — Vitis vinifera, 4 replicates, BAMs named `*.sorted.bam`:**
 
 ```bash
 conda activate dirtv2
-mkdir -p /mnt/f/PhD_Research/DiRTv2_optimized_run
-cd       /mnt/f/PhD_Research/DiRTv2_optimized_run
-cp /mnt/f/PhD_Research/.../DiRTv2_pipeline/bin/DiRTv2_manual_optimized.Rmd .
+WORK_DIR=/path/to/dirtv2_run            # <-- absolute path, change to yours
+mkdir -p "$WORK_DIR" && cd "$WORK_DIR"
 
-Rscript -e "rmarkdown::render('DiRTv2_manual_optimized.Rmd', \
-    params = list( \
-        gff_file       = '/mnt/f/PhD_Research/Thesis_writing/Manuscripts/Bio-Protocol/Data/PN40024_5.1_on_T2T_ref_with_names.gff3', \
-        genome_fai     = '/mnt/f/PhD_Research/Thesis_writing/Manuscripts/Bio-Protocol/Data/T2T_ref.fasta.fai', \
-        tRNA_bed       = '/mnt/f/PhD_Research/Thesis_writing/Manuscripts/Bio-Protocol/Data/tRNA.bed', \
-        bam_dir        = '/mnt/f/PhD_Research/Thesis_writing/Manuscripts/Bio-Protocol/Data', \
-        sample_names   = c('RSL1','RSL2','RSL3','RSL4'), \
-        min_count      = 1, \
-        fdr_threshold  = 0.05, \
-        out_dir        = 'results', \
-    ))" 2>&1 | tee dirtv2_render.log
+Rscript - <<'RSCRIPT' 2>&1 | tee dirtv2_render.log
+WORK_DIR <- "/path/to/dirtv2_run"       # same absolute path, hard-coded so the quoted heredoc keeps backslashes intact
+rmarkdown::render(
+  '/path/to/DiRTv2_pipeline/bin/DiRTv2_manual_optimized.Rmd',
+  output_file   = 'DiRTv2_vitis_report.html',
+  output_dir    = WORK_DIR,
+  knit_root_dir = WORK_DIR,
+  params = list(
+    gff_file       = '/path/to/Input/PN40024_5.1_on_T2T_ref_with_names.gff3',
+    genome_fai     = '/path/to/Input/T2T_ref.fasta.fai',
+    tRNA_bed       = '/path/to/Input/tRNA.bed',
+    bam_dir        = '/path/to/bam_folder',
+    bam_pattern    = '\\.sorted\\.bam$',
+    sample_names   = c('RSL1','RSL2','RSL3','RSL4'),
+    min_count      = 1,
+    fdr_threshold  = 0.05,
+    out_dir        = paste0(WORK_DIR, '/results')
+  )
+)
+RSCRIPT
 ```
+
+**Example 2 — Arabidopsis thaliana, 3 replicates, BAMs named `*.sorted.merged.bam`:**
+
+```bash
+conda activate dirtv2
+WORK_DIR=/path/to/dirtv2_arabidopsis_run    # <-- absolute path, change to yours
+mkdir -p "$WORK_DIR" && cd "$WORK_DIR"
+
+Rscript - <<'RSCRIPT' 2>&1 | tee dirtv2_render.log
+WORK_DIR <- "/path/to/dirtv2_arabidopsis_run"
+rmarkdown::render(
+  '/path/to/DiRTv2_pipeline/bin/DiRTv2_manual_optimized.Rmd',
+  output_file   = 'DiRTv2_arabidopsis_report.html',
+  output_dir    = WORK_DIR,
+  knit_root_dir = WORK_DIR,
+  params = list(
+    gff_file       = '/path/to/Input/Arabidopsis_thaliana.TAIR10.59.gff3',
+    genome_fai     = '/path/to/Input/Arabidopsis_thaliana.TAIR10.dna.toplevel.fa.fai',
+    tRNA_bed       = '/path/to/Input/tRNA.bed',
+    bam_dir        = '/path/to/Data',
+    bam_pattern    = '\\.sorted\\.merged\\.bam$',
+    sample_names   = c('ERR1','ERR2','ERR3'),
+    min_count      = 1,
+    fdr_threshold  = 0.05,
+    out_dir        = paste0(WORK_DIR, '/results')
+  )
+)
+RSCRIPT
+```
+
+Notice the only differences between examples 1 and 2: `gff_file`, `genome_fai`,
+`bam_dir`, `bam_pattern` (which has the extra `\.merged`), `sample_names` (3 vs 4
+entries). Everything else stays identical.
 
 ---
 
@@ -354,6 +517,40 @@ The final `Location_Type` column classifies where each tRNA sits relative to its
 | `UTR` | tRNA overlaps the gene but not its CDS — likely 5'/3' UTR |
 | `CDS-Internal` | tRNA is fully inside the CDS (rare; flag for inspection) |
 | `CDS-Edge_Conflict` | tRNA partially overlaps the CDS edge (rare; flag for inspection) |
+
+### Verifying a successful run
+
+After the render finishes, three quick checks confirm everything landed where it should:
+
+```bash
+WORK_DIR=/abs/path/to/your_run_folder   # the same path you passed in the heredoc
+
+# 1. The HTML report should be tens of MB (small = render aborted early)
+ls -lh "$WORK_DIR"/*report.html
+
+# 2. The final xlsx should exist under results/
+ls -lh "$WORK_DIR"/results/Final_Result_Manual_optimized.xlsx
+
+# 3. Row count = number of dicistronic-transcript candidates detected
+python3 -c "
+import openpyxl, sys
+fp = '$WORK_DIR/results/Final_Result_Manual_optimized.xlsx'
+ws = openpyxl.load_workbook(fp, data_only=True).active
+print(f'rows (incl. header): {ws.max_row}')
+print(f'dicistronic candidates: {ws.max_row - 1}')
+"
+```
+
+**If `results/` is missing or empty but the HTML report exists**, your `out_dir` / `knit_root_dir` weren't absolute paths — re-run with the `WORK_DIR` pattern shown in section B.5 / B.6. The intermediates and xlsx most likely went to the directory containing the `.Rmd` file (`bin/`).
+
+**Expected order-of-magnitude (per published reports for tRNA-mRNA dicistronic transcripts):**
+
+| Species & tissue | Replicates | Approximate DT candidates |
+|---|---|---|
+| Vitis vinifera, leaf (RSL) | 4 | ~40 |
+| Arabidopsis thaliana, leaf (PRJEB32714) | 3 | ~30 |
+
+These are coarse expectations — exact counts depend on the FDR threshold, the `min_count` filter, and per-replicate library depth. Counts within ~5 of these targets indicate the pipeline ran correctly.
 
 ---
 
@@ -417,7 +614,8 @@ Example: `-profile slurm,singularity` runs on SLURM with Singularity containers.
 |---|---|---|
 | `EnvironmentNameNotFound: dirtv2` | env wasn't created (the install errored silently) | Re-run `mamba env create -f conf/environment.yml` and watch for solver errors |
 | `Solving environment: working...` for > 30 min | Classic conda solver | Switch to libmamba: `conda config --set solver libmamba` |
-| `Could not match all params$sample_names to BAM files` (Path B) | `bam_dir` is wrong or BAM filenames don't match `sample_names` | Use an **absolute** path; rename BAMs to match `<sample>.sorted.bam` exactly |
+| `Could not match all params$sample_names to BAM files` (Path B) | `bam_dir` is wrong, or BAM filenames don't match the implicit IDs derived by stripping `bam_pattern` from each basename | Use an **absolute** `bam_dir` path; set `bam_pattern` to match the actual BAM suffix (e.g. `'\\.sorted\\.merged\\.bam$'` for `*.sorted.merged.bam`). The error message prints the derived IDs vs. the expected IDs so you can see exactly which side is wrong. |
+| `Error: '\.' is an unrecognized escape in character string` (Path B) | You used `Rscript -e "..."` (double quotes) and wrote `'\\.sorted\\.bam$'` — bash collapses `\\` to `\`, leaving R with an invalid `\.` escape | Switch to the heredoc form shown in B.5 (`Rscript - <<'RSCRIPT' … RSCRIPT`) — heredocs pass every character through unchanged. Or, if you really want to keep `-e "..."`, use **four** backslashes: `'\\\\.sorted\\\\.bam$'` |
 | Error from `intergenic-info` chunk: "names of metadata columns cannot be one of strand, …" | Old version of the Rmd before the `make_gr()` patch | Re-copy `bin/DiRTv2_manual_optimized.Rmd` from this repo |
 | `unable to find an inherited method for function 'first' for signature 'x = "factor"'` | Old version of the Rmd before the namespace-qualification patch | Re-copy `bin/DiRTv2_manual_optimized.Rmd` |
 | `Error in readGAlignments`: zero reads counted | BAM chromosome names don't match FASTA/GFF3 (e.g. `chr01` vs `1`) | Re-do Step B.3 chromosome-name check and reconcile |

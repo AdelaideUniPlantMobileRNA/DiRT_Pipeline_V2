@@ -63,7 +63,11 @@ tran_length_table  <- GenomicFeatures::transcriptLengths(Gff_tran_db)
 canonical_transcripts <- tran_length_table %>%
   group_by(gene_id) %>%
   slice_max(order_by = tx_len, n = 1, with_ties = FALSE) %>%
-  pull(tx_name)
+  pull(tx_name) %>%
+  # Strip optional "transcript:" / "gene:" / "CDS:" prefix (present in
+  # Ensembl-style GFFs, absent in others) so the match against the
+  # post-strip exon parent IDs below works in both cases.
+  str_remove("^(gene:|CDS:|transcript:)")
 ```
 
 ### Gene information from GFF file
@@ -275,16 +279,19 @@ GRange_tRNA <- makeGRangesFromDataFrame(tRNA.CDS.combo,
 # specify Samples
 bam.dir <- params$bam_dir
 bamfiles <- list.files(bam.dir, pattern = params$bam_pattern, full.names = TRUE)
-# Match BAM basenames to user-friendly sample names from params$sample_names
-# (e.g. params$sample_names = c("RSL1","RSL2","RSL3","RSL4") and the BAM dir
-# contains RSL1.sorted.bam, RSL2.sorted.bam, ...). The reordering below makes
-# column order in count tables deterministic regardless of file-system order.
-expected   <- paste0(params$sample_names, ".sorted.bam")
-match_idx  <- match(expected, basename(bamfiles))
+# Derive an implicit sample ID for each BAM by stripping params$bam_pattern from
+# the basename. e.g. with bam_pattern = "\\.sorted\\.bam$" -> "RSL1.sorted.bam"
+# becomes "RSL1"; with bam_pattern = "\\.sorted\\.merged\\.bam$" ->
+# "ERR1.sorted.merged.bam" becomes "ERR1". Then match those derived IDs to
+# params$sample_names so the column order is deterministic.
+implied    <- sub(params$bam_pattern, "", basename(bamfiles))
+match_idx  <- match(params$sample_names, implied)
 if (any(is.na(match_idx))) {
   stop("Could not match all params$sample_names to BAM files in ", bam.dir,
-       "\n  Expected: ", paste(expected, collapse = ", "),
-       "\n  Found:    ", paste(basename(bamfiles), collapse = ", "))
+       "\n  Expected sample IDs (params$sample_names): ", paste(params$sample_names, collapse = ", "),
+       "\n  Derived from BAM basenames:                ", paste(implied, collapse = ", "),
+       "\n  bam_pattern used to derive them:           ", params$bam_pattern,
+       "\n  All BAMs found:                            ", paste(basename(bamfiles), collapse = ", "))
 }
 bamfiles    <- bamfiles[match_idx]
 SampleName  <- params$sample_names
