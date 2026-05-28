@@ -15,6 +15,19 @@ The pipeline supports **three entry points**:
 
 The quick test and Path B produce the same kind of final result table; Path A produces the same table plus all the intermediate FASTQ/BAM artefacts.
 
+## Input data requirements
+
+DiRT v2 is designed for and tested on:
+
+- **Paired-end Illumina RNA-seq**, with **poly-A enriched** library preparation. Other library types (e.g., total-RNA / rRNA-depleted) are not the design target — they may or may not work but are not validated.
+- **Minimum 3 biological replicates** per condition (required). Three replicates is the floor; more replicates improve statistical power. The paired Student's t-test (intergenic vs. intron coverage, FDR < 0.05) becomes increasingly reliable with more replicates.
+- A **reference genome FASTA** and a matching **GFF3 annotation** (e.g. from EnsemblPlants).
+- For Path B (BAM input): sorted and indexed BAM files (`samtools sort` + `samtools index`), one per biological replicate.
+
+These requirements are described in the manuscript Methods. Running on fewer replicates, single-end data, or non-poly-A libraries is outside the validated design and the result tables may not be biologically meaningful.
+
+---
+
 ## Repository layout
 
 ```
@@ -392,7 +405,7 @@ rmarkdown::render(
     tRNA_bed       = '/abs/path/to/tRNA.bed',
     bam_dir        = '/abs/path/to/folder_containing_bams',
     bam_pattern    = '\\\\.sorted\\\\.bam\$',
-    sample_names   = c('rep1','rep2','rep3'),
+    sample_names   = c('rep1','rep2','rep3'),   # minimum 3 biological replicates
     min_count      = 1,
     fdr_threshold  = 0.05,
     out_dir        = paste0(WORK_DIR, '/results')
@@ -566,7 +579,7 @@ All parameters are settable from the CLI (Path A) or the `params = list(...)` bl
 | `genome_fai` | — | FASTA index (Path B; auto-built in Path A) |
 | `tRNA_bed` | — | tRNAscan-SE output in BED format (Path B; auto-built in Path A) |
 | `bam_dir` | — | Absolute path to folder containing the BAMs (Path B) |
-| `sample_names` | — | Vector of replicate names matching BAM filename stems (Path B) |
+| `sample_names` | — | Vector of replicate names matching BAM filename stems (Path B). **Minimum 3 entries required**; more are encouraged for statistical power. |
 | `hisat2_index` | (built from genome) | Optional prebuilt HISAT2 index prefix (Path A) |
 | `min_count` | 1 | Minimum read count in **every** sample to call a tRNA/gene "expressed" |
 | `fdr_threshold` | 0.05 | FDR cutoff for paired t-tests (intergenic vs intron, intron vs intron) |
