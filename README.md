@@ -639,13 +639,44 @@ Example: `-profile slurm,singularity` runs on SLURM with Singularity containers.
 
 ## 7. Citation
 
-This pipeline accompanies the Bio-Protocol manuscript:
+### Citing this pipeline
 
-> Zheng, F. et al. (2026). *DiRT v2: A Standardized Pipeline for Dicistronic Transcript
-> Detection from Plant RNA-Seq Data.* Bio-Protocol.
+If you use DiRT v2 in your work, please cite the accompanying manuscript:
 
-Tool citations are included in the rendered HTML report's session-info section. If
-you use the Nextflow path, please also cite Nextflow (Di Tommaso et al., 2017).
+> Zheng, F., Anand, L., Magnani, R., Rodríguez López, C. M. and David, R. (2026).
+> *DiRT v2.0: An Optimized Bioinformatics Pipeline for Detecting Dicistronic
+> tRNA-mRNA Transcripts in Plants.* Bio-Protocol. **(In revision. DOI to be
+> assigned upon publication.)**
+
+And the test dataset deposit:
+
+> Zheng, F., Anand, L., Magnani, R., Rodríguez López, C. M. and David, R. (2026).
+> *Vitis vinifera RSL leaf RNA-seq test dataset for the DiRT v2 pipeline.*
+> Zenodo. https://doi.org/10.5281/zenodo.20421456
+
+### Citing the underlying tools
+
+The DiRT v2 workflow wraps these tools — if you publish using DiRT v2, please
+also cite the tools it actually ran on your data:
+
+| Tool | Used for | Citation |
+|---|---|---|
+| Nextflow | Workflow management (Path A) | Di Tommaso, P. et al. (2017). *Nature Biotechnology* 35, 316–319. |
+| HISAT2 | Read alignment (Path A) | Kim, D. et al. (2019). *Nature Biotechnology* 37, 907–915. |
+| samtools | BAM handling | Danecek, P. et al. (2021). *GigaScience* 10, giab008. |
+| bedtools | Interval operations | Quinlan, A. R. & Hall, I. M. (2010). *Bioinformatics* 26, 841–842. |
+| tRNAscan-SE | tRNA locus detection | Chan, P. P. & Lowe, T. M. (2019). *Methods in Molecular Biology* 1962, 1–14. |
+| GenomicAlignments / GenomicFeatures / rtracklayer | R/Bioconductor — BAM coverage, GFF parsing, TxDb construction | Lawrence, M. et al. (2013). *PLOS Computational Biology* 9, e1003118. |
+
+### Predecessor pipeline
+
+DiRT v2 builds on DiRT v1.0:
+
+> Fabres, P. J., Anand, L., Sai, N., Pederson, S., Zheng, F., Stewart, A. A.,
+> Clements, B., Lampugnani, E. R., Breen, J. and Gilliham, M. (2021).
+> *Tissue and regional expression patterns of dicistronic tRNA–mRNA transcripts
+> in grapevine (Vitis vinifera) and their evolutionary co-appearance with
+> vasculature in land plants.* Horticulture Research 8.
 
 ## 8. License
 
