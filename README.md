@@ -47,7 +47,10 @@ DiRTv2_pipeline/
 │   ├── DiRTv2_manual_optimized.Rmd      Parameterized R Markdown — the actual analysis
 │   ├── 01_RNA_mapping.sh         Optional standalone bash mapper (no Nextflow)
 │   ├── 02_generate_tRNA_bed.sh   Helper: tRNAscan-SE + BED conversion (for Path B)
-│   └── optional_sra_download.sh  Optional SRA → FASTQ helper
+│   ├── optional_sra_download.sh  Optional SRA → FASTQ helper
+│   └── legacy/                   Original unoptimized DiRT v2 Rmd, kept for reference
+│       ├── DiRTv2_vitis_fromGff3_annotation.Rmd  Original interactive-only Rmd
+│       └── README.md             Why this is here / not for production use
 ├── conf/
 │   ├── environment.yml           Full conda env (all tools — for Path A)
 │   ├── environment_minimal.yml   Smaller conda env (BAM-input only — for Path B)
@@ -618,6 +621,26 @@ Example: `-profile slurm,singularity` runs on SLURM with Singularity containers.
 - tRNAscan-SE 2.0.12
 - R 4.3 + tidyverse, magrittr, data.table, openxlsx, reshape2, rmarkdown, knitr
 - Bioconductor: GenomicAlignments, GenomicFeatures, rtracklayer, txdbmaker
+
+---
+
+## 6a. Platform compatibility & getting help
+
+DiRT v2 has been developed and validated on Linux and on Windows-Subsystem-for-Linux 2 (WSL2, Ubuntu 22.04). The Nextflow workflow and the parameterized R Markdown are designed to be portable, but **your run may encounter restrictions specific to your operating system, your conda environment, or your local compute setup** — for example, differences in installed C library versions, GLIBC compatibility on older HPC nodes, network/firewall restrictions on `wget` from Zenodo or conda mirrors, or differences in how WSL2 exposes Windows-mounted filesystems.
+
+If something doesn't work the way the README describes, **please don't assume the pipeline is broken — most of these issues are environment-specific and quickly resolved.** We are happy to help. The best way to get a response is to open an issue on the GitHub repository:
+
+> **https://github.com/<USER>/<REPO>/issues**
+
+When filing an issue, please include:
+
+- Your operating system / WSL version (`uname -a` is a good one-liner)
+- The conda environment in which you ran the pipeline (`conda list -n dirtv2 > env.txt`)
+- The exact command you ran
+- The full error message or attached log file (`dirtv2_render.log` for Path B; `.nextflow.log` for Path A)
+- Optionally, the contents of the rendered `*_report.html` if the render finished but the result is unexpected
+
+This is a research-software release. Reproducibility on common platforms (recent Ubuntu, WSL2, macOS via conda) is intended; long-tail environment edge cases will be addressed on a best-effort basis as time allows.
 
 ---
 
