@@ -1048,6 +1048,18 @@ tTestResults.final <- tRnaToGene$ids %>%
   arrange(p) %>%
   split(f = .$comparison)
 ```
+# Plot example candidates
+```{r}
+# x     <- tRnaToGene$ids[1]
+# combo <- filter(tRnaToGene, ids == x)$id
+# cov   <- filter(aveCoverage.final, id == combo) %>%
+#   acast(Sample ~ type, value.var = "aveCoverage")
+# 
+# boxplot(log(cov + 1),
+#         main = paste("Candidate:", x),
+#         ylab = "log(coverage + 1)",
+#         col  = c("lightblue", "lightgreen", "lightcoral"))
+```
 ## t.test output
 ```{r two way filtering}
 # for FDR
