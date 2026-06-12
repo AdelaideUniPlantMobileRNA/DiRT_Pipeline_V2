@@ -28,6 +28,34 @@ These requirements are described in the manuscript Methods. Running on fewer rep
 
 ---
 
+## Recommended pre-DiRT QC: detect genomic DNA contamination
+
+Following adapter removal and FastQC analysis, we recommend an additional
+quality-control step to detect and (if needed) filter out genomic DNA
+contamination that may have been co-extracted during RNA preparation and
+carried over into the sequencing library. DiRT v2 does not perform this
+step internally — it is suggested as an upstream sanity check to ensure
+robust downstream interpretation of dicistronic-transcript candidates.
+
+The R/Bioconductor package **CleanUpRNAseq** ([Liu et al., 2024](https://doi.org/10.3390/biotech13030030);
+[GitHub](https://github.com/haibol2016/CleanUpRNAseq/tree/devel)) provides
+sample-level gDNA-contamination detection for both stranded and unstranded
+RNA-seq protocols.
+
+**Interpretation guidance**
+
+- **gDNA fraction ≲ 1%** — no correction required; this level is within
+  typical sampling and sequencing noise.
+- **gDNA fraction > 1%** — apply one of CleanUpRNAseq's correction methods
+  (`correct_global()` for unstranded data, `correct_stranded()` for stranded
+  data; see the package vignette).
+
+> **Note:** This QC step is independent of DiRT v2 and is not run by the
+> Nextflow workflow or the Rscript heredoc. Users wishing to apply it
+> should do so after adapter trimming but before alignment / DiRT v2.
+
+---
+
 ## Repository layout
 
 ```
