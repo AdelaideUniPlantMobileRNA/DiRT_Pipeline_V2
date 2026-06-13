@@ -89,12 +89,26 @@ gene.information <- gene.info.from.gff %>%
 CDS.info.sorted <- gene.info.from.gff %>%
   filter(type == "CDS") %>%
   mutate(across(where(is.list), ~ sapply(., paste, collapse = ","))) %>%
-  dplyr::select(where(~ !all(is.na(.) | as.character(.) == "" | as.character(.) == "character(0)")))%>%
-  dplyr::select(c("seqnames", "start", "end", "strand", "type", "ID" )) %>%
-  set_colnames(c("Chr", "start", "end", "strand", "type", "gene.id" )) %>%
+  
+  # 1. Safely generate fallback columns. 
+  # If the column doesn't exist in this specific file, it fills it with NA instead of crashing.
   mutate(
+    gene_id = if("gene_id" %in% names(.)) gene_id else NA_character_,
+    Parent  = if("Parent" %in% names(.)) Parent else NA_character_,
+    ID      = if("ID" %in% names(.)) ID else NA_character_
+  ) %>%
+  mutate(universal_id = coalesce(gene_id, Parent, ID)) %>%
+  dplyr::select(
+    Chr = seqnames, 
+    start, 
+    end, 
+    strand, 
+    type, 
+    gene.id = universal_id
+  ) %>%
+mutate(
     gene.id = str_remove(gene.id, "^(gene:|CDS:|transcript:)"),
-    gene.id = str_remove(gene.id, "(\\.\\d+|_t\\d+.*)$")
+    gene.id = str_remove(gene.id, "(\\.[tT]?\\d+.*|[-_][tT]\\d+.*)$")
   )
   
 exon.info.canonical <- gene.info.from.gff %>%
@@ -105,10 +119,11 @@ exon.info.canonical <- gene.info.from.gff %>%
   set_colnames(c("Chr", "start", "end", "strand", "type", "gene.id" )) %>%
   # Strip optional 'gene:/CDS:/transcript:' prefix first so we can match against
   # canonical_transcripts (which holds transcript IDs like geneA_t1).
-  mutate(gene.id = str_remove(gene.id, "^(gene:|CDS:|transcript:)")) %>%
-  filter(gene.id %in% canonical_transcripts) %>%
-  # Now collapse the _t<digit> suffix so we have one entry per gene.
-  mutate(gene.id = str_remove(gene.id, "(\\.\\d+|_t\\d+.*)$"))
+  mutate(gene.id = str_remove(gene.id, "^(gene:|CDS:|transcript:|)")) %>%
+  filter(gene.id %in% canonical_transcripts)%>%  mutate(
+    gene.id = str_remove(gene.id, "^(gene:|CDS:|transcript:)"),
+    gene.id = str_remove(gene.id, "(\\.[tT]?\\d+.*|[-_][tT]\\d+.*)$")
+  )
 
 # Get CDS start and end points per gene
 CDS.start.end.for.gene <- CDS.info.sorted %>%
@@ -185,9 +200,10 @@ write.table(tRNA.fixed,
 # Make genome size file for bedtools use
 ```{bash}
 # Original block: conda + samtools faidx + cut + sort + bedtools closest.
-# `samtools faidx` skipped (T2T_ref.fasta.fai already provided in Input_Files
-# and staged into the working directory). `conda activate` lines removed because
-# they break a non-interactive bash chunk. Everything else is unchanged.
+# `samtools faidx` skipped (the .fai is provided via the `genome_fai` param
+# and exposed to bash as $FAI_FILE in the setup-params R chunk).
+# `conda activate` lines removed because they break a non-interactive bash
+# chunk. Everything else is unchanged.
 cut -f1,2 "$FAI_FILE" > Reference_genome.txt
 
 # Sort the CDS file
@@ -638,8 +654,36 @@ write.table(introns.bed,
 
 ### Step2. Use Bed tools to get nearby gene with two or more introns for candidates with 1/0 intron
 ```{bash}
-# For candidates with one intron — bedtools call unchanged.
-bedtools closest -a One_intron.txt -b ALL_introns_info.txt > One_Intron_closest_Intron.bed
+# 1. Safely process File A (Strip Windows \r, verify numbers, fix math, force tabs)
+awk '{
+    sub(/\r$/, ""); 
+    if ($2 ~ /^[0-9]+$/ && $3 ~ /^[0-9]+$/) {
+        if (($2+0) > ($3+0)) {
+            tmp=$2; $2=$3; $3=tmp;
+        }
+        $1=$1; 
+        print $0;
+    }
+}' OFS='\t' One_intron.txt > One_intron_fixed.bed
+
+# 2. Safely process File B
+awk '{
+    sub(/\r$/, ""); 
+    if ($2 ~ /^[0-9]+$/ && $3 ~ /^[0-9]+$/) {
+        if (($2+0) > ($3+0)) {
+            tmp=$2; $2=$3; $3=tmp;
+        }
+        $1=$1; 
+        print $0;
+    }
+}' OFS='\t' ALL_introns_info.txt > ALL_introns_fixed.bed
+
+# 3. Sort the safely generated files
+bedtools sort -i One_intron_fixed.bed > One_intron_sorted.bed
+bedtools sort -i ALL_introns_fixed.bed > ALL_introns_info_sorted.bed
+
+# 4. Run the closest command
+bedtools closest -a One_intron_sorted.bed -b ALL_introns_info_sorted.bed > One_Intron_closest_Intron.bed
 ```
 # Step3. Construct Intron information for candidates with one intron
 # Load Closest introns information
@@ -730,10 +774,36 @@ write.table(tRNA_mRNA_expressed_No_Intron,
 ### Step2. Use Bed tools to get nearby gene with two or more introns for candidates with no intron
 
 ```{bash}
-# For candidates with no intron — bedtools call unchanged.
-bedtools closest -a RNA_No_intron.txt \
--b ALL_introns_info.txt \
--k 2 > RNA_No_Intron_closest2_Introns.bed
+# 1. Safely process File A (Strip Windows \r, verify numbers, fix math, force tabs)
+awk '{
+    sub(/\r$/, ""); 
+    if ($2 ~ /^[0-9]+$/ && $3 ~ /^[0-9]+$/) {
+        if (($2+0) > ($3+0)) {
+            tmp=$2; $2=$3; $3=tmp;
+        }
+        $1=$1; 
+        print $0;
+    }
+}' OFS='\t' RNA_No_intron.txt > RNA_No_intron_fixed.bed
+
+# 2. Safely process File B
+awk '{
+    sub(/\r$/, ""); 
+    if ($2 ~ /^[0-9]+$/ && $3 ~ /^[0-9]+$/) {
+        if (($2+0) > ($3+0)) {
+            tmp=$2; $2=$3; $3=tmp;
+        }
+        $1=$1; 
+        print $0;
+    }
+}' OFS='\t' ALL_introns_info.txt > ALL_introns_fixed.bed
+
+# 3. Sort the safely generated files
+bedtools sort -i RNA_No_intron_fixed.bed > RNA_No_intron_sorted.bed
+bedtools sort -i ALL_introns_fixed.bed > ALL_introns_info_sorted.bed
+
+# 4. Run the closest command with your -k 2 flag
+bedtools closest -a RNA_No_intron_sorted.bed -b ALL_introns_info_sorted.bed -k 2 > RNA_No_Intron_closest2_Introns.bed
 ```
 # Step3. Construct Intron information for candidates without intron
 # tRNA-mRNA expressed candidates with No intron
@@ -1174,7 +1244,7 @@ DT_Final_Classified <- DT_with_Gene_Startend %>%
 ```
 # export results
 ```{r}
-write_xlsx(DT_Final_Classified, path = file.path(params$out_dir, "Final_Result_Manual_optimized.xlsx"))
+write_xlsx(DT_Final_Classified, path = file.path(params$out_dir, "Final_Result_RSR_toSHZ2alleles.xlsx"))
 ```
 
 ####======= Finish DT detection for any candidates with any number of introns ========####

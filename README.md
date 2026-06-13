@@ -21,10 +21,15 @@ DiRT v2 is designed for and tested on:
 
 - **Paired-end Illumina RNA-seq**, with **poly-A enriched** library preparation. Other library types (e.g., total-RNA / rRNA-depleted) are not the design target — they may or may not work but are not validated.
 - **Minimum 3 biological replicates** per condition (required). Three replicates is the floor; more replicates improve statistical power. The paired Student's t-test (intergenic vs. intron coverage, FDR < 0.05) becomes increasingly reliable with more replicates.
-- A **reference genome FASTA** and a matching **GFF3 annotation** (e.g. from EnsemblPlants).
-- For Path B (BAM input): sorted and indexed BAM files (`samtools sort` + `samtools index`), one per biological replicate.
+- A **reference genome FASTA** and a matching annotation **in GFF3 format** (e.g. from EnsemblPlants). **GTF input is not supported** — the Rmd parses GFF3-style `ID=` / `Parent=` attributes for the `gene → mRNA → exon` hierarchy. If your annotation is in GTF or in a non-standard GFF3 dialect (e.g. AUGUSTUS output without `gene` rows), convert it to a properly hierarchical GFF3 first with the included helper script (wraps [AGAT](https://github.com/NBISweden/AGAT)):
+  ```bash
+  conda activate dirtv2
+  ./bin/03_convert_gtf_to_gff3.sh annotation.gtf annotation.AGAT.gff3
+  ```
+  Then pass the produced `annotation.AGAT.gff3` as the `gff_file` parameter.
+- For Path B (BAM input): **sorted and indexed BAM files named `<sample>.sorted.bam`** (with matching `<sample>.sorted.bam.bai` index), one per biological replicate. The `.sorted.bam` suffix is the default `bam_pattern` the Rmd uses to derive sample IDs; if your files have a different suffix you must override `bam_pattern` accordingly (see [Path B § "Critical naming convention"](#critical-naming-convention)). Produce them with `samtools sort` + `samtools index`.
 
-These requirements are described in the manuscript Methods. Running on fewer replicates, single-end data, or non-poly-A libraries is outside the validated design and the result tables may not be biologically meaningful.
+These requirements are described in the manuscript Methods. Running on fewer replicates, single-end data, non-poly-A libraries, GTF annotations, or BAMs with non-standard suffixes is outside the validated design and the result tables may not be biologically meaningful.
 
 ---
 
@@ -75,6 +80,7 @@ DiRTv2_pipeline/
 │   ├── DiRTv2_manual_optimized.Rmd      Parameterized R Markdown — the actual analysis
 │   ├── 01_RNA_mapping.sh         Optional standalone bash mapper (no Nextflow)
 │   ├── 02_generate_tRNA_bed.sh   Helper: tRNAscan-SE + BED conversion (for Path B)
+│   ├── 03_convert_gtf_to_gff3.sh Helper: GTF (or AUGUSTUS-style GFF3) → proper hierarchical GFF3 via AGAT
 │   ├── optional_sra_download.sh  Optional SRA → FASTQ helper
 │   └── legacy/                   Original unoptimized DiRT v2 Rmd, kept for reference
 │       ├── DiRTv2_vitis_fromGff3_annotation.Rmd  Original interactive-only Rmd
